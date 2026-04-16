@@ -75,8 +75,6 @@ fun TunerCanvas(viewModel: TunerViewModel) {
                 isAntiAlias = true
             }
             val label = if (i == 0) viewModel.selectedKattai else "${i}c"
-            val textWidth = textPaint.measureText(label)
-            val textPadding = 20f // Space between text and the start of the line
             val lineStartX = if (i % 10 == 0) textPaint.measureText(label) + 30f else 0f
 
             val y = centerY - (i * plotScaleY)
