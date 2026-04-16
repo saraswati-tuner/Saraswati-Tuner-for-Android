@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +46,14 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
 
 @Composable
 fun TunerCanvas(viewModel: TunerViewModel) {
+    // Tuner background
+    Image(
+        painter = painterResource(id = R.drawable.nataraja_bg),
+        contentDescription = "Nataraja background",
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize()
+    )
+
     viewModel.triggerToggle // Subscribes TunerCanvas to watch for changes in triggerToggle
 
     val targetFreq = viewModel.targetFreq
@@ -58,7 +67,7 @@ fun TunerCanvas(viewModel: TunerViewModel) {
         drawRect(Color.Green.copy(0.15f), Offset(0f, centerY - 5 * plotScaleY),
             Size(size.width, 10 * plotScaleY))
 
-        // Grid Lines
+        // Horiz Grid Lines
         for (i in -50..50 step 5) {
             val textPaint = android.graphics.Paint().apply {
                 color = if (i == 0) android.graphics.Color.WHITE else android.graphics.Color.LTGRAY
@@ -85,7 +94,12 @@ fun TunerCanvas(viewModel: TunerViewModel) {
             }
         }
 
-            // Circular Buffer Drawing Logic
+        // Vert Grid Lines
+        for (x in 50 .. size.width.toInt() step 100) {
+            drawLine(Color.Gray.copy(alpha = 0.8f), Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height))
+        }
+
+        // Circular Buffer Drawing Logic
         for (i in 0 until viewModel.maxPoints - 1) {
             val currIdx = (viewModel.writeIndex + i) % viewModel.maxPoints
             val nextIdx = (viewModel.writeIndex + i + 1) % viewModel.maxPoints
