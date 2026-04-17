@@ -110,6 +110,14 @@ fun SaraswatiApp(tunerVM: TunerViewModel = viewModel()) {
                     val validCount = pitchWindow.count { it > 0f }
                     val sma = if (validCount > 0) pitchWindow.sum() / validCount else 0f
 
+                    // Calculate deviation in cents for the stability timer
+                    val targetFreq = tunerVM.targetFreq
+                    if (targetFreq > 0f && sma > 0f) {
+                        val cents = 1200 * kotlin.math.log2(sma.toDouble() / targetFreq)
+                        // Update the stability timer using the calculated delta
+                        tunerVM.updateStability(cents)
+                    }
+
                     mainHandler.post { tunerVM.updatePitch(sma) }
                     return@PitchDetectionHandler
                 }

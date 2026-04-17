@@ -1,5 +1,7 @@
 package com.example.saraswati
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -16,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -25,21 +28,42 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.getValue
 import kotlin.math.log2
 
 // --- UI LAYER: DRAWING & CONTROLS ---
 @Composable
 fun TunerMainScreen(viewModel: TunerViewModel) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(40.dp))
-        Text("%.2f Hz".format(viewModel.currentPitch), fontSize = 16.sp, color = Color.White)
+        val bloomAlpha by animateFloatAsState(
+            targetValue = if (viewModel.isBlooming) 0.7f else 0f,
+            animationSpec = tween(durationMillis = 2000),
+            label = "Saraswati"
+        )
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.height(40.dp))
+            Text("%.2f Hz".format(viewModel.currentPitch), fontSize = 16.sp, color = Color.White)
 
-        Box(modifier = Modifier.weight(1f)) { TunerCanvas(viewModel) }
+            Box(modifier = Modifier.weight(1f)) {
+                TunerCanvas(viewModel)
 
-        Row(modifier = Modifier.padding(bottom = 32.dp)) {
-            Button(onClick = { viewModel.updateKattai("G#2") }) { Text("G#2") }
-            Spacer(Modifier.width(8.dp))
-            Button(onClick = { viewModel.updateKattai("C#3") }) { Text("C#3") }
+                // 2. The Blooming Saraswati (Overlay)
+                Image(
+                    painter = painterResource(id = R.drawable.saraswati_bloom),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(40.dp)
+                        .alpha(bloomAlpha),
+                    contentScale = ContentScale.Fit
+                )
+            }
+
+            Row(modifier = Modifier.padding(bottom = 32.dp)) {
+                Button(onClick = { viewModel.updateKattai("G#2") }) { Text("G#2") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { viewModel.updateKattai("C#3") }) { Text("C#3") }
+            }
         }
     }
 }
@@ -64,14 +88,14 @@ fun TunerCanvas(viewModel: TunerViewModel) {
         val stepX = size.width / viewModel.maxPoints
 
         // Goal Zone
-        drawRect(Color.Green.copy(0.15f), Offset(0f, centerY - 5 * plotScaleY),
+        drawRect(Color.Green.copy(0.25f), Offset(0f, centerY - 5 * plotScaleY),
             Size(size.width, 10 * plotScaleY))
 
         // Horiz Grid Lines
         for (i in -50..50 step 5) {
             val textPaint = android.graphics.Paint().apply {
                 color = if (i == 0) android.graphics.Color.WHITE else android.graphics.Color.LTGRAY
-                textSize = 28f // grid labels
+                textSize = 36f // grid labels
                 isAntiAlias = true
             }
             val label = if (i == 0) viewModel.selectedKattai else "${i}c"
@@ -92,9 +116,17 @@ fun TunerCanvas(viewModel: TunerViewModel) {
             }
         }
 
-        // Vert Grid Lines
-        for (x in 50 .. size.width.toInt() step 100) {
-            drawLine(Color.Gray.copy(alpha = 0.8f), Offset(x.toFloat(), 0f), Offset(x.toFloat(), size.height))
+        // Vert Grid Lines - Matching the horizontal 5-cent step size for perfect squares
+        val squareStep = 5 * plotScaleY
+        var xPos = 0f
+        while (xPos <= size.width) {
+            drawLine(
+                color = Color.Gray.copy(alpha = 0.5f),
+                start = Offset(xPos, 0f),
+                end = Offset(xPos, size.height),
+                strokeWidth = 0.5.dp.toPx()
+            )
+            xPos += squareStep
         }
 
         // Circular Buffer Drawing Logic
