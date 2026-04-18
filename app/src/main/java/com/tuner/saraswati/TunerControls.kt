@@ -1,6 +1,6 @@
 // Dropdown menus
 
-package com.example.saraswati
+package com.tuner.saraswati
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

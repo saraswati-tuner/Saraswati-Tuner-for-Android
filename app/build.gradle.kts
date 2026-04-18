@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.saraswati"
+    namespace = "com.tuner.saraswati"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.saraswati.b15sma50"
+        applicationId = "com.tuner.saraswati.b15sma50"
         minSdk = 24
         targetSdk = 35
         versionCode = 2
@@ -36,6 +36,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

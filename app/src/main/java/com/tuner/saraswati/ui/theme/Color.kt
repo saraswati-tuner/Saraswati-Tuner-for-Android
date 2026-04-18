@@ -1,4 +1,4 @@
-package com.example.saraswati.ui.theme
+package com.tuner.saraswati.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
