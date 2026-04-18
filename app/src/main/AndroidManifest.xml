@@ -16,7 +16,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label= "Saraswati B15SMA50"
+            android:label= "Saraswati"
             android:theme="@style/Theme.Saraswati">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

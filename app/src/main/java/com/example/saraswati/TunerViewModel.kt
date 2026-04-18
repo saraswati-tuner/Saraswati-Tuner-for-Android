@@ -8,12 +8,37 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 
-class TunerViewModel : ViewModel() {
-    val splashDurationMillis = 1000L
-    val kattaiMap = mapOf("G#2" to 103.83f, "C#3" to 138.59f)
+enum class SkillLevel(val label: String, val goal: Float) {
+    BEGINNER("Beginner", 15f),
+    INTERMEDIATE("Intermediate", 5f),
+    ADVANCED("Advanced", 2f),
+    PROFESSIONAL("Professional", 1f)
+}
 
-    // UI State
-    var selectedKattai by mutableStateOf("G#2"); private set
+class TunerViewModel : ViewModel() {
+    var currentLevel by mutableStateOf(SkillLevel.BEGINNER) // Default
+
+    val targetPitchOptions = linkedMapOf(
+        "F2" to 87.31f,
+        "F#2" to 92.50f,
+        "G2" to 98.00f,
+        "G#2" to 103.83f,
+        "A2" to 110.00f,
+        "A#2" to 116.54f,
+        "B2" to 123.47f,
+        "C3" to 130.81f,
+        "C#3" to 138.59f,
+        "D3" to 146.83f
+    )
+    var selectedTargetPitch by mutableStateOf("G#2") // Default
+    var targetFreq by mutableStateOf(103.83f)
+
+    fun updateTargetPitch(label: String) {
+        selectedTargetPitch = label
+        targetFreq = targetPitchOptions[label] ?: 103.83f
+    }
+    val splashDurationMillis = 1000L
+
     var currentPitch by mutableFloatStateOf(0f); private set
 
     // Circular Buffer Data
@@ -22,18 +47,11 @@ class TunerViewModel : ViewModel() {
     var writeIndex by mutableIntStateOf(0)
     var triggerToggle by mutableStateOf(false)
 
-    val targetFreq: Float
-        get() = kattaiMap[selectedKattai] ?: 103.83f
-
     // Controls when and how Saraswati bloom appears on sustaining within target zone
     var targetZoneCents by mutableStateOf(5.0f)
     var stabilityMillis by mutableStateOf(0L)
     var bloomThreshold = 5000L
-    val isBlooming by derivedStateOf { stabilityMillis >= bloomThreshold } // 5 seconds threshold
-
-    fun updateKattai(newKattai: String) {
-        selectedKattai = newKattai
-    }
+    val isBlooming by derivedStateOf { stabilityMillis >= bloomThreshold }
 
     fun updatePitch(newPitch: Float) {
         currentPitch = newPitch
@@ -59,6 +77,7 @@ class TunerViewModel : ViewModel() {
     fun updateStability(currentCents: Double) {
         if (kotlin.math.abs(currentCents) <= targetZoneCents) {
             stabilityMillis += frameDurationMillis
+            //Log.d("Saraswati Tuner", "stabilitymillis = $stabilityMillis")
         } else {
             stabilityMillis = 0L
         }

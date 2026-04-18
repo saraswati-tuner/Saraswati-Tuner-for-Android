@@ -5,17 +5,19 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,43 +30,59 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.getValue
 import kotlin.math.log2
 
 // --- UI LAYER: DRAWING & CONTROLS ---
 @Composable
 fun TunerMainScreen(viewModel: TunerViewModel) {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        val bloomAlpha by animateFloatAsState(
-            targetValue = if (viewModel.isBlooming) 0.7f else 0f,
-            animationSpec = tween(durationMillis = 2000),
-            label = "Saraswati"
-        )
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Spacer(Modifier.height(40.dp))
-            Text("%.2f Hz".format(viewModel.currentPitch), fontSize = 16.sp, color = Color.White)
+    // Saraswati Bloom animation state
+    val bloomAlpha by animateFloatAsState(
+        targetValue = if (viewModel.isBlooming) 0.9f else 0f,
+        animationSpec = tween(durationMillis = 2000),
+        label = "Saraswati"
+    )
 
-            Box(modifier = Modifier.weight(1f)) {
-                TunerCanvas(viewModel)
-
-                // 2. The Blooming Saraswati (Overlay)
-                Image(
-                    painter = painterResource(id = R.drawable.saraswati_bloom),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(40.dp)
-                        .alpha(bloomAlpha),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            Row(modifier = Modifier.padding(bottom = 32.dp)) {
-                Button(onClick = { viewModel.updateKattai("G#2") }) { Text("G#2") }
-                Spacer(Modifier.width(8.dp))
-                Button(onClick = { viewModel.updateKattai("C#3") }) { Text("C#3") }
-            }
+    Column(
+        modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp), // Minimal top padding
+            horizontalArrangement = Arrangement.Center, // Center the whole row
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TargetPitchDropDown(viewModel)
+            Spacer(Modifier.width(24.dp)) // Gap between the two menus
+            LevelDropDown(viewModel)
         }
+        Box( // Middle - Plot (and bloom) area
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            TunerCanvas(viewModel)
+
+            Image(
+                painter = painterResource(id = R.drawable.saraswati_bloom),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(40.dp)
+                    .alpha(bloomAlpha),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        // Bottom - (smoothed) freq display
+        Text(
+            text = if (viewModel.currentPitch > 0) "%.2f Hz".format(viewModel.currentPitch) else "---- Hz",
+            fontSize = 20.sp,
+            color = Color.White.copy(alpha = 0.8f),
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
     }
 }
 
@@ -88,8 +106,12 @@ fun TunerCanvas(viewModel: TunerViewModel) {
         val stepX = size.width / viewModel.maxPoints
 
         // Goal Zone
-        drawRect(Color.Green.copy(0.25f), Offset(0f, centerY - 5 * plotScaleY),
-            Size(size.width, 10 * plotScaleY))
+        val currentGoal = viewModel.currentLevel.goal
+        drawRect(
+            color = Color.Green.copy(0.25f),
+            topLeft = Offset(0f, centerY - currentGoal * plotScaleY),
+            size = Size(size.width, (currentGoal * 2) * plotScaleY)
+        )
 
         // Horiz Grid Lines
         for (i in -50..50 step 5) {
@@ -98,7 +120,7 @@ fun TunerCanvas(viewModel: TunerViewModel) {
                 textSize = 36f // grid labels
                 isAntiAlias = true
             }
-            val label = if (i == 0) viewModel.selectedKattai else "${i}c"
+            val label = if (i == 0) viewModel.selectedTargetPitch else "${i}c"
             val lineStartX = if (i % 10 == 0) textPaint.measureText(label) + 30f else 0f
 
             val y = centerY - (i * plotScaleY)
@@ -111,7 +133,7 @@ fun TunerCanvas(viewModel: TunerViewModel) {
 
             if (i % 10 == 0) {
                 drawIntoCanvas { canvas ->
-                    val label = if (i == 0) viewModel.selectedKattai else "${i}c"
+                    val label = if (i == 0) viewModel.selectedTargetPitch else "${i}c"
                     canvas.nativeCanvas.drawText(label, 10f, y + 10f, textPaint)                }
             }
         }
