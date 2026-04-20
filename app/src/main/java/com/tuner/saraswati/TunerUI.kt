@@ -78,6 +78,15 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             )
         }
 
+        // 2. NEW: Centered Target Frequency Footer (Gray)
+        Text(
+            text = "${viewModel.activePitch.freq} Hz",
+            color = Color.Gray,
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
         // Bottom - (smoothed) freq display (Monospace prevents jumping around)
         Text(
             text = if (viewModel.currentPitch > 0) "%.2f Hz".format(viewModel.currentPitch) else "---- Hz",
@@ -125,9 +134,11 @@ private fun DrawScope.drawGoalZone(centerY: Float, scaleY: Float, goal: Float) {
 }
 
 private fun DrawScope.drawGrid(centerY: Float, scaleY: Float, label: String, activeColor: Color) {
+    val labelSizePx = with(density) { 12.sp.toPx() }
     val textPaint = android.graphics.Paint().apply {
-        textSize = 42f
+        textSize = labelSizePx
         isAntiAlias = true
+        setShadowLayer(5f, 0f, 0f, android.graphics.Color.BLACK)
     }
 
     // Horizontal lines & Labels
@@ -142,8 +153,8 @@ private fun DrawScope.drawGrid(centerY: Float, scaleY: Float, label: String, act
         val lineStartX = if (isMajor) textPaint.measureText(lineLabel) + 30f else 0f
 
         drawLine(
-            color = activeColor,
-            alpha = if (i==0) 0.8f else 0.2f, // 0c line is the primary target
+            color = Color.Gray,
+            alpha = if (i==0) 0.8f else 0.5f, // 0c line is the primary target
 
             start = Offset(lineStartX, y),
             end = Offset(size.width, y),
@@ -160,7 +171,7 @@ private fun DrawScope.drawGrid(centerY: Float, scaleY: Float, label: String, act
     var xPos = 0f
     while (xPos <= size.width) {
         drawLine(
-            color = Color.Gray.copy(alpha = 0.5f),
+            color = Color.Gray.copy(alpha = .5f),
             start = Offset(xPos, 0f),
             end = Offset(xPos, size.height),
             strokeWidth = 0.5.dp.toPx()

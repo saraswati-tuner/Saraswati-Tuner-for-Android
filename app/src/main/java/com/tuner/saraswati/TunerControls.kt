@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,7 +75,10 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
             onDismissRequest = { expanded = false },
             shadowElevation = 0.dp,
             modifier = Modifier
-                .background(Color(0xFF1A1A1A))
+                .background(
+                    Color(0xFF0A0A0A).copy(alpha = 0.95f), // Darker and more opaque
+                    RoundedCornerShape(12.dp)
+                )
                 .border(0.5.dp, Color.White.copy(alpha = 0.2f))
         ) {
             TargetPitch.entries.forEach { pitch ->
@@ -82,8 +87,7 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
                         Text(
                             text = pitch.label,
                             color = pitch.color,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = MaterialTheme.typography.bodyMedium, // Apply the bloom
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
@@ -140,7 +144,10 @@ fun LevelDropDown(viewModel: TunerViewModel) {
             onDismissRequest = { expanded = false },
             shadowElevation = 0.dp,
             modifier = Modifier
-                .background(Color(0xFF1A1A1A))
+                .background(
+                    Color(0xFF0A0A0A).copy(alpha = 0.95f), // Darker and more opaque
+                    RoundedCornerShape(12.dp)
+                )
                 // Force the menu to match the row's width exactly
                 .width(with(LocalDensity.current) { rowWidth.toDp() })
         ) {
@@ -150,7 +157,7 @@ fun LevelDropDown(viewModel: TunerViewModel) {
                         Text(
                             text = level.label,
                             color = Color.White,
-                            fontSize = 14.sp,
+                            style = MaterialTheme.typography.bodyMedium, // Apply the bloom
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
