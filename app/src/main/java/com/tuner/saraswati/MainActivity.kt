@@ -95,7 +95,7 @@ fun SaraswatiApp(tunerVM: TunerViewModel = viewModel()) {
     val readyToProceed = timerFinished && micInitialized
 
     // Audio Engine Side-Effect (restarts when targetFreq/kattai changes)
-    LaunchedEffect(readyToProceed, tunerVM.selectedTargetPitch) {
+    LaunchedEffect(readyToProceed, tunerVM.selectedTargetPitchLabel) {
         if (!readyToProceed) return@LaunchedEffect
 
         val pitchWindow = FloatArray(AudioConfig.SMA_WINDOW_SIZE) { 0f }

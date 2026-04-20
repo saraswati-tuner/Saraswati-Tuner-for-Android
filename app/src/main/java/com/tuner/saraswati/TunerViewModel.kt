@@ -16,30 +16,11 @@ enum class SkillLevel(val label: String, val goal: Float) {
 }
 
 class TunerViewModel : ViewModel() {
-    var currentLevel by mutableStateOf(SkillLevel.BEGINNER) // Default
-
-    val targetPitchOptions = linkedMapOf(
-        "F2" to 87.31f,
-        "F#2" to 92.50f,
-        "G2" to 98.00f,
-        "G#2" to 103.83f,
-        "A2" to 110.00f,
-        "A#2" to 116.54f,
-        "B2" to 123.47f,
-        "C3" to 130.81f,
-        "C#3" to 138.59f,
-        "D3" to 146.83f
-    )
-    var selectedTargetPitch by mutableStateOf("G#2") // Default
-    var targetFreq by mutableStateOf(103.83f)
-
-    fun updateTargetPitch(label: String) {
-        selectedTargetPitch = label
-        targetFreq = targetPitchOptions[label] ?: 103.83f
-    }
     val splashDurationMillis = 1000L
+    var currentPitch by mutableFloatStateOf(0f); private set // For display screen bottom
 
-    var currentPitch by mutableFloatStateOf(0f); private set
+    var currentLevel by mutableStateOf(SkillLevel.BEGINNER)  // Default
+    val targetZoneCents by derivedStateOf { currentLevel.goal }
 
     // Circular Buffer Data
     val maxPoints = 200
@@ -48,10 +29,30 @@ class TunerViewModel : ViewModel() {
     var triggerToggle by mutableStateOf(false)
 
     // Controls when and how Saraswati bloom appears on sustaining within target zone
-    var targetZoneCents by mutableStateOf(5.0f)
     var stabilityMillis by mutableStateOf(0L)
-    var bloomThreshold = 5000L
+    var bloomThreshold = 5000L // 5s of continuous hold within targetZone cents
     val isBlooming by derivedStateOf { stabilityMillis >= bloomThreshold }
+
+    var activePitch by mutableStateOf(TargetPitch.G_SHARP_2) // default G#2
+        private set
+
+    val targetFreq: Float get() = activePitch.freq
+    val selectedTargetPitchLabel: String get() = activePitch.label
+
+    fun updateTargetPitch(newPitchLabel: String) {
+        val newPitch = TargetPitch.fromLabel(newPitchLabel)
+        if (activePitch != newPitch) {
+            activePitch = newPitch
+            clearPitchHistory()
+            stabilityMillis = 0L // Reset stability on pitch change
+        }
+    }
+
+    private fun clearPitchHistory() {
+        history.fill(-1f)
+        writeIndex = 0
+        triggerToggle = !triggerToggle
+    }
 
     fun updatePitch(newPitch: Float) {
         currentPitch = newPitch
@@ -67,19 +68,21 @@ class TunerViewModel : ViewModel() {
         triggerToggle = !triggerToggle
     }
 
-    private var frameDurationMillis: Long = 0L
-    init {
-        // Calculate the ms duration of the non-overlapping part of the buffer
-        val stepSamples = (AudioConfig.BUFFER_SIZE - AudioConfig.OVERLAP).toDouble()
-        frameDurationMillis = ((stepSamples / AudioConfig.SAMPLE_RATE) * 1000).toLong()
-    }
+    // How long to hold freq for bloom to appear
+    private var _frameDurationMillis: Long = 0L
 
     fun updateStability(currentCents: Double) {
         if (kotlin.math.abs(currentCents) <= targetZoneCents) {
-            stabilityMillis += frameDurationMillis
-            //Log.d("Saraswati Tuner", "stabilitymillis = $stabilityMillis")
+            stabilityMillis += _frameDurationMillis
+            //Log.d("Saraswati Tuner", "stabilitymillis = $stabilityMillis, tz = ${targetZoneCents}")
         } else {
             stabilityMillis = 0L
         }
+    }
+
+    init {
+        // Calculate the ms duration of the non-overlapping part of the buffer
+        val stepSamples = (AudioConfig.BUFFER_SIZE - AudioConfig.OVERLAP).toDouble()
+        _frameDurationMillis = ((stepSamples / AudioConfig.SAMPLE_RATE) * 1000).toLong()
     }
 }

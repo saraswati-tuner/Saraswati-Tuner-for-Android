@@ -55,7 +55,7 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = viewModel.selectedTargetPitch,
+                text = viewModel.selectedTargetPitchLabel,
                 fontSize = 14.sp,
                 color = Color.White,
                 fontFamily = FontFamily.Monospace
@@ -71,18 +71,17 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            // shadowElevation = 0.dp is vital to prevent a solid gray "shadow" block
             shadowElevation = 0.dp,
             modifier = Modifier
                 .background(Color(0xFF1A1A1A))
                 .border(0.5.dp, Color.White.copy(alpha = 0.2f))
         ) {
-            viewModel.targetPitchOptions.keys.forEach { label ->
+            TargetPitch.entries.forEach { pitch ->
                 DropdownMenuItem(
                     text = {
                         Text(
-                            text = label,
-                            color = Color.White,
+                            text = pitch.label,
+                            color = pitch.color,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.fillMaxWidth(),
@@ -90,7 +89,7 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
                         )
                     },
                     onClick = {
-                        viewModel.updateTargetPitch(label)
+                        viewModel.updateTargetPitch(pitch.label)
                         expanded = false
                     },
                     contentPadding = PaddingValues(vertical = 0.dp, horizontal = 16.dp)

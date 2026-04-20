@@ -24,20 +24,22 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.log2
 
 // --- UI LAYER: DRAWING & CONTROLS ---
 @Composable
 fun TunerMainScreen(viewModel: TunerViewModel) {
     // Saraswati Bloom animation state
     val bloomAlpha by animateFloatAsState(
-        targetValue = if (viewModel.isBlooming) 0.9f else 0f,
+        targetValue = if (viewModel.isBlooming) 0.95f else 0f,
         animationSpec = tween(durationMillis = 2000),
         label = "Saraswati"
     )
@@ -76,12 +78,13 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             )
         }
 
-        // Bottom - (smoothed) freq display
+        // Bottom - (smoothed) freq display (Monospace prevents jumping around)
         Text(
             text = if (viewModel.currentPitch > 0) "%.2f Hz".format(viewModel.currentPitch) else "---- Hz",
             fontSize = 20.sp,
-            color = Color.White.copy(alpha = 0.8f),
-            modifier = Modifier.padding(bottom = 32.dp)
+            color = viewModel.activePitch.color.copy(alpha = 0.9f),
+            modifier = Modifier.padding(bottom = 32.dp),
+            fontFamily = FontFamily.Monospace
         )
     }
 }
@@ -97,78 +100,114 @@ fun TunerCanvas(viewModel: TunerViewModel) {
     )
 
     viewModel.triggerToggle // Subscribes TunerCanvas to watch for changes in triggerToggle
-
     val targetFreq = viewModel.targetFreq
+    val activeColor = viewModel.activePitch.color
 
     Canvas(Modifier.fillMaxSize().padding(vertical = 60.dp)) {
         val centerY = size.height / 2f
         val plotScaleY = size.height / 100f
         val stepX = size.width / viewModel.maxPoints
 
-        // Goal Zone
-        val currentGoal = viewModel.currentLevel.goal
-        drawRect(
-            color = Color.Green.copy(0.25f),
-            topLeft = Offset(0f, centerY - currentGoal * plotScaleY),
-            size = Size(size.width, (currentGoal * 2) * plotScaleY)
+        drawGoalZone(centerY, plotScaleY, viewModel.currentLevel.goal)
+        drawGrid(centerY, plotScaleY, viewModel.selectedTargetPitchLabel, activeColor)
+
+        // Dynamic pitch plot
+        drawPitchHistory(viewModel, targetFreq, activeColor, centerY, plotScaleY, stepX)
+    }
+}
+
+private fun DrawScope.drawGoalZone(centerY: Float, scaleY: Float, goal: Float) {
+    drawRect(
+        color = Color.Green.copy(0.25f),
+        topLeft = Offset(0f, centerY - goal * scaleY),
+        size = Size(size.width, (goal * 2) * scaleY)
+    )
+}
+
+private fun DrawScope.drawGrid(centerY: Float, scaleY: Float, label: String, activeColor: Color) {
+    val textPaint = android.graphics.Paint().apply {
+        textSize = 42f
+        isAntiAlias = true
+    }
+
+    // Horizontal lines & Labels
+    for (i in -50..50 step 5) {
+        val y = centerY - (i * scaleY)
+        val isMajor = i % 10 == 0
+
+        textPaint.color = activeColor.toArgb()
+        textPaint.alpha = if (i % 10 == 0) 200 else if (i==0) 255 else 140
+
+        val lineLabel = if (i == 0) label else "${i}c"
+        val lineStartX = if (isMajor) textPaint.measureText(lineLabel) + 30f else 0f
+
+        drawLine(
+            color = activeColor,
+            alpha = if (i==0) 0.8f else 0.2f, // 0c line is the primary target
+
+            start = Offset(lineStartX, y),
+            end = Offset(size.width, y),
+            strokeWidth = if (i == 0) 1.dp.toPx() else 0.5.dp.toPx()
         )
 
-        // Horiz Grid Lines
-        for (i in -50..50 step 5) {
-            val textPaint = android.graphics.Paint().apply {
-                color = if (i == 0) android.graphics.Color.WHITE else android.graphics.Color.LTGRAY
-                textSize = 36f // grid labels
-                isAntiAlias = true
-            }
-            val label = if (i == 0) viewModel.selectedTargetPitch else "${i}c"
-            val lineStartX = if (i % 10 == 0) textPaint.measureText(label) + 30f else 0f
-
-            val y = centerY - (i * plotScaleY)
-            val lineColor = when {
-                i == 0 -> Color.White.copy(alpha = 0.8f)
-                i % 10 == 0 -> Color.Gray.copy(alpha = 0.7f)
-                else -> Color.Gray.copy(alpha = 0.5f)
-            }
-            drawLine(lineColor, Offset(lineStartX, y), Offset(size.width, y), 1.dp.toPx())
-
-            if (i % 10 == 0) {
-                drawIntoCanvas { canvas ->
-                    val label = if (i == 0) viewModel.selectedTargetPitch else "${i}c"
-                    canvas.nativeCanvas.drawText(label, 10f, y + 10f, textPaint)                }
-            }
+        if (isMajor) {
+            drawIntoCanvas { it.nativeCanvas.drawText(lineLabel, 10f, y + 10f, textPaint) }
         }
+    }
 
-        // Vert Grid Lines - Matching the horizontal 5-cent step size for perfect squares
-        val squareStep = 5 * plotScaleY
-        var xPos = 0f
-        while (xPos <= size.width) {
+    // Vert Grid Lines - Matching the horizontal 5-cent step size for perfect squares
+    val squareStep = 5 * scaleY
+    var xPos = 0f
+    while (xPos <= size.width) {
+        drawLine(
+            color = Color.Gray.copy(alpha = 0.5f),
+            start = Offset(xPos, 0f),
+            end = Offset(xPos, size.height),
+            strokeWidth = 0.5.dp.toPx()
+        )
+        xPos += squareStep
+    }
+}
+
+private fun DrawScope.drawPitchHistory(
+    vm: TunerViewModel,
+    target: Float,
+    color: Color,
+    centerY: Float,
+    scaleY: Float,
+    stepX: Float
+) {
+    // Draw the Dynamic Emanator (The Leading Edge) only if there is a valid current pitch
+    if (vm.currentPitch > 0f) {
+        val currentCents = 1200 * kotlin.math.log2(vm.currentPitch / target)
+        val emanatorY = centerY - (currentCents.toFloat() * scaleY)
+        val rightInset = 8.dp.toPx()
+
+        drawCircle(
+            color = color,
+            radius = 3.dp.toPx(),
+            center = Offset(size.width - rightInset, emanatorY)
+        )
+    }
+
+    // Draw the Scrolling Tail (History Lines) from the circular buffer
+    for (i in 0 until vm.maxPoints - 1) {
+        val currIdx = (vm.writeIndex + i) % vm.maxPoints
+        val nextIdx = (vm.writeIndex + i + 1) % vm.maxPoints
+
+        val p1 = vm.history[currIdx]
+        val p2 = vm.history[nextIdx]
+
+        if (p1 > 0f && p2 > 0f) {
+            val c1 = 1200 * kotlin.math.log2(p1 / target)
+            val c2 = 1200 * kotlin.math.log2(p2 / target)
+
             drawLine(
-                color = Color.Gray.copy(alpha = 0.5f),
-                start = Offset(xPos, 0f),
-                end = Offset(xPos, size.height),
-                strokeWidth = 0.5.dp.toPx()
+                color = color,
+                start = Offset(i * stepX, centerY - (c1 * scaleY)),
+                end = Offset((i + 1) * stepX, centerY - (c2 * scaleY)),
+                strokeWidth = 1.dp.toPx()
             )
-            xPos += squareStep
-        }
-
-        // Circular Buffer Drawing Logic
-        for (i in 0 until viewModel.maxPoints - 1) {
-            val currIdx = (viewModel.writeIndex + i) % viewModel.maxPoints
-            val nextIdx = (viewModel.writeIndex + i + 1) % viewModel.maxPoints
-
-            val p1 = viewModel.history[currIdx]
-            val p2 = viewModel.history[nextIdx]
-
-            if (p1 > 0f && p2 > 0f) {
-                val c1 = 1200 * log2(p1 / targetFreq)
-                val c2 = 1200 * log2(p2 / targetFreq)
-                drawLine(
-                    color = Color.Green,
-                    start = Offset(i * stepX, centerY - (c1 * plotScaleY)),
-                    end = Offset((i + 1) * stepX, centerY - (c2 * plotScaleY)),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
         }
     }
 }
