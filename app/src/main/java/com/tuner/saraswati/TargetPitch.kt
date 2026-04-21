@@ -7,7 +7,7 @@ enum class TargetPitch(
     val freq: Float,
     val color: Color
 ) {
-    G_SHARP_2("G#2", 103.83f, Color(0xFFFF0000)), // Red (Root)
+    G_SHARP_2("G#2", 103.83f, Color(0xFFFF3131)), // Neon Red (Root)
     A_2("A2", 110.00f, Color(0xFFFFA500)),       // Orange
     A_SHARP_2("A#2", 116.54f, Color(0xFFFFFF00)), // Yellow
     B_2("B2", 123.47f, Color(0xFF00FF00)),       // Green

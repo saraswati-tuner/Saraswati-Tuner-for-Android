@@ -30,7 +30,7 @@ class TunerViewModel : ViewModel() {
 
     // Controls when and how Saraswati bloom appears on sustaining within target zone
     var stabilityMillis by mutableStateOf(0L)
-    var bloomThreshold = 5000L // 5s of continuous hold within targetZone cents
+    var bloomThreshold = 10000L // 5s of continuous hold within targetZone cents
     val isBlooming by derivedStateOf { stabilityMillis >= bloomThreshold }
 
     var activePitch by mutableStateOf(TargetPitch.G_SHARP_2) // default G#2

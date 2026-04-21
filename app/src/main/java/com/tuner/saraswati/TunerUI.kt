@@ -188,17 +188,63 @@ private fun DrawScope.drawPitchHistory(
     scaleY: Float,
     stepX: Float
 ) {
+    // Setup for the "Dark Drop" shadow effect behind pitch trace
+    val discRadius = 4.dp.toPx()
+    val strokeWidthPx = 2.dp.toPx()
+
+    val shadowPaint = android.graphics.Paint().apply {
+        style = android.graphics.Paint.Style.STROKE
+        strokeWidth = strokeWidthPx + 1.dp.toPx()
+        this.color = android.graphics.Color.BLACK
+        maskFilter = android.graphics.BlurMaskFilter(15f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+    }
+
     // Draw the Dynamic Emanator (The Leading Edge) only if there is a valid current pitch
     if (vm.currentPitch > 0f) {
         val currentCents = 1200 * kotlin.math.log2(vm.currentPitch / target)
         val emanatorY = centerY - (currentCents.toFloat() * scaleY)
-        val rightInset = 8.dp.toPx()
+        val centerPos = Offset(size.width - discRadius, emanatorY)
 
+        drawCircle( // Subtle dark glow behind the disc
+            color = Color.Black.copy(alpha = 0.5f),
+            radius = discRadius + 1.dp.toPx(),
+            center = centerPos
+        )
         drawCircle(
             color = color,
-            radius = 3.dp.toPx(),
-            center = Offset(size.width - rightInset, emanatorY)
+            radius = 4.dp.toPx(),
+            center = centerPos
         )
+    }
+
+    // 1. FIRST LOOP: Draw ONLY the shadow for the entire tail
+    for (i in 0 until vm.maxPoints - 1) {
+        val currIdx = (vm.writeIndex + i) % vm.maxPoints
+        val nextIdx = (vm.writeIndex + i + 1) % vm.maxPoints
+
+        val p1 = vm.history[currIdx]
+        val p2 = vm.history[nextIdx]
+
+        if (p1 > 0f && p2 > 0f) {
+            val c1 = 1200 * kotlin.math.log2(p1 / target).toFloat()
+            val c2 = 1200 * kotlin.math.log2(p2 / target).toFloat()
+
+            val startOffset = Offset(i * stepX, centerY - (c1 * scaleY))
+            val endOffset = Offset((i + 1) * stepX, centerY - (c2 * scaleY))
+
+            // vert offset behind the plot trace (apr 21 - decided to leave at 0 for now - no offset)
+            val shadowYOffset = 6.dp.toPx()
+
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawLine(
+                    startOffset.x,
+                    startOffset.y + shadowYOffset, // Now you can safely use your offset
+                    endOffset.x,
+                    endOffset.y + shadowYOffset,
+                    shadowPaint
+                )
+            }
+        }
     }
 
     // Draw the Scrolling Tail (History Lines) from the circular buffer
@@ -213,11 +259,14 @@ private fun DrawScope.drawPitchHistory(
             val c1 = 1200 * kotlin.math.log2(p1 / target)
             val c2 = 1200 * kotlin.math.log2(p2 / target)
 
+            val startOffset = Offset(i * stepX, centerY - (c1 * scaleY))
+            val endOffset = Offset((i + 1) * stepX, centerY - (c2 * scaleY))
+
             drawLine(
                 color = color,
                 start = Offset(i * stepX, centerY - (c1 * scaleY)),
                 end = Offset((i + 1) * stepX, centerY - (c2 * scaleY)),
-                strokeWidth = 1.dp.toPx()
+                strokeWidth = 2.dp.toPx()
             )
         }
     }
