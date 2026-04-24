@@ -98,46 +98,14 @@ fun SaraswatiApp(tunerVM: TunerViewModel = viewModel()) {
     LaunchedEffect(readyToProceed, tunerVM.selectedTargetPitchLabel) {
         if (!readyToProceed) return@LaunchedEffect
 
-        val pitchWindow = FloatArray(AudioConfig.SMA_WINDOW_SIZE) { 0f }
-        var nextPitchNdx = 0
-
         val dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(
             AudioConfig.SAMPLE_RATE,AudioConfig.BUFFER_SIZE, AudioConfig.OVERLAP)
 
+        // Offload all processing to the ViewModel
         val handler = PitchDetectionHandler { result, _ ->
-            var p = result.pitch
-            val target = tunerVM.targetFreq
-
-            if (p > AudioConfig.HEARING_THRESHOLD && result.probability > 0.6f) {
-                while (p < target * 0.707f) p *= 2f
-                while (p > target * 1.414f) p /= 2f
-
-                if (p in (target * 0.7f)..(target * 1.3f)) {
-                    pitchWindow[nextPitchNdx] = p
-                    nextPitchNdx = (nextPitchNdx + 1) % AudioConfig.SMA_WINDOW_SIZE
-
-                    // TODO: Consider keeping runningSum to avoid needless array fullscan
-                    val validCount = pitchWindow.count { it > 0f }
-                    val sma = if (validCount > 0) pitchWindow.sum() / validCount else 0f
-
-                    // Calculate deviation in cents for the stability timer
-                    val targetFreq = tunerVM.targetFreq
-                    if (targetFreq > 0f && sma > 0f) {
-                        val cents = 1200 * kotlin.math.log2(sma.toDouble() / targetFreq)
-                        // Update the stability timer using the calculated delta
-                        tunerVM.updateStability(cents)
-                    }
-
-                    mainHandler.post { tunerVM.updatePitch(sma) }
-                    return@PitchDetectionHandler
-                }
-            }
-            if (result.probability < 0.4f || p <= 0f) {
-                pitchWindow.fill(0f)
-                nextPitchNdx = 0
-                mainHandler.post { tunerVM.resetPitch() }
-            }
+            tunerVM.processNewPitch(result.pitch, result.probability)
         }
+
         // *2.5f allows up to targetFreq plus some in next octave
         dispatcher.addAudioProcessor(LowPassFS(tunerVM.targetFreq * 2.5f, AudioConfig.SAMPLE_RATE.toFloat()))
         dispatcher.addAudioProcessor(PitchProcessor(PitchEstimationAlgorithm.YIN,

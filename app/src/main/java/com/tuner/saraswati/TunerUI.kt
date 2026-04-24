@@ -24,8 +24,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -59,13 +63,14 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             Spacer(Modifier.width(24.dp)) // Gap between the two menus
             LevelDropDown(viewModel)
         }
+
         Box( // Middle - Plot (and bloom) area
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             contentAlignment = Alignment.Center
         ) {
-            TunerCanvas(viewModel)
+            Box(Modifier.graphicsLayer {}) { TunerCanvas(viewModel) }
 
             Image(
                 painter = painterResource(id = R.drawable.saraswati_bloom),
@@ -100,28 +105,43 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
 
 @Composable
 fun TunerCanvas(viewModel: TunerViewModel) {
-    // Tuner background
+    // Static Background
     Image(
         painter = painterResource(id = R.drawable.nataraja_bg),
-        contentDescription = "Nataraja background",
+        contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize()
     )
 
-    viewModel.triggerToggle // Subscribes TunerCanvas to watch for changes in triggerToggle
-    val targetFreq = viewModel.targetFreq
     val activeColor = viewModel.activePitch.color
 
+    // LAYER 1: Static Grid (only re-draws if level or target changes)
     Canvas(Modifier.fillMaxSize().padding(vertical = 60.dp)) {
+        val centerY = size.height / 2f
+        val plotScaleY = size.height / 100f
+        drawGoalZone(centerY, plotScaleY, viewModel.currentLevel.goal)
+        drawGrid(centerY, plotScaleY, viewModel.selectedTargetPitchLabel, activeColor)
+    }
+
+    // LAYER 2: Dynamic Pitch History (re-draws every (46)ms)
+    Canvas(
+        Modifier
+            .fillMaxSize()
+            .padding(vertical = 60.dp)
+            // Use graphicsLayer here to ensure this layer is hardware-accelerated
+            .graphicsLayer()
+    ) {
         val centerY = size.height / 2f
         val plotScaleY = size.height / 100f
         val stepX = size.width / viewModel.maxPoints
 
-        drawGoalZone(centerY, plotScaleY, viewModel.currentLevel.goal)
-        drawGrid(centerY, plotScaleY, viewModel.selectedTargetPitchLabel, activeColor)
-
-        // Dynamic pitch plot
-        drawPitchHistory(viewModel, targetFreq, activeColor, centerY, plotScaleY, stepX)
+        drawPitchHistory(
+            vm = viewModel,
+            color = activeColor,
+            centerY = centerY,
+            scaleY = plotScaleY,
+            stepX = stepX
+        )
     }
 }
 
@@ -182,94 +202,71 @@ private fun DrawScope.drawGrid(centerY: Float, scaleY: Float, label: String, act
 
 private fun DrawScope.drawPitchHistory(
     vm: TunerViewModel,
-    target: Float,
     color: Color,
     centerY: Float,
     scaleY: Float,
     stepX: Float
 ) {
-    // Setup for the "Dark Drop" shadow effect behind pitch trace
-    val discRadius = 4.dp.toPx()
-    val strokeWidthPx = 2.dp.toPx()
+    // Draw a tiny filled disc at the leading edge of the plot
+    val leadIdx = (vm.writeIndex + vm.maxPoints - 1) % vm.maxPoints
+    val leadP = vm.history[leadIdx]
+    if (leadP > 0f) {
+        // Access pre-calculated data instead of performing log2 here
+        val leadCents = vm.centsHistory[leadIdx]
+        val discRadius = 4.dp.toPx()
 
-    val shadowPaint = android.graphics.Paint().apply {
-        style = android.graphics.Paint.Style.STROKE
-        strokeWidth = strokeWidthPx + 1.dp.toPx()
-        this.color = android.graphics.Color.BLACK
-        maskFilter = android.graphics.BlurMaskFilter(15f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-    }
-
-    // Draw the Dynamic Emanator (The Leading Edge) only if there is a valid current pitch
-    if (vm.currentPitch > 0f) {
-        val currentCents = 1200 * kotlin.math.log2(vm.currentPitch / target)
-        val emanatorY = centerY - (currentCents.toFloat() * scaleY)
-        val centerPos = Offset(size.width - discRadius, emanatorY)
+        val xOffset = size.width - discRadius - 4.dp.toPx()
+        val centerPos = Offset(xOffset, centerY - (leadCents * scaleY))
 
         drawCircle( // Subtle dark glow behind the disc
             color = Color.Black.copy(alpha = 0.5f),
             radius = discRadius + 1.dp.toPx(),
             center = centerPos
         )
-        drawCircle(
+        drawCircle( // The tiny disc itself
             color = color,
-            radius = 4.dp.toPx(),
+            radius = discRadius,
             center = centerPos
         )
     }
 
-    // 1. FIRST LOOP: Draw ONLY the shadow for the entire tail
-    for (i in 0 until vm.maxPoints - 1) {
-        val currIdx = (vm.writeIndex + i) % vm.maxPoints
-        val nextIdx = (vm.writeIndex + i + 1) % vm.maxPoints
+    val path = Path()
+    var firstPoint = true
 
-        val p1 = vm.history[currIdx]
-        val p2 = vm.history[nextIdx]
+    for (i in 0 until vm.maxPoints) {
+        val idx = (vm.writeIndex + i) % vm.maxPoints
+        val p = vm.history[idx]
 
-        if (p1 > 0f && p2 > 0f) {
-            val c1 = 1200 * kotlin.math.log2(p1 / target).toFloat()
-            val c2 = 1200 * kotlin.math.log2(p2 / target).toFloat()
+        if (p > 0f) {
+            val cents = vm.centsHistory[idx] // Data from background thread
+            val x = i * stepX
+            val y = centerY - (cents * scaleY)
 
-            val startOffset = Offset(i * stepX, centerY - (c1 * scaleY))
-            val endOffset = Offset((i + 1) * stepX, centerY - (c2 * scaleY))
-
-            // vert offset behind the plot trace (apr 21 - decided to leave at 0 for now - no offset)
-            val shadowYOffset = 6.dp.toPx()
-
-            drawIntoCanvas { canvas ->
-                canvas.nativeCanvas.drawLine(
-                    startOffset.x,
-                    startOffset.y + shadowYOffset, // Now you can safely use your offset
-                    endOffset.x,
-                    endOffset.y + shadowYOffset,
-                    shadowPaint
-                )
+            if (firstPoint) {
+                path.moveTo(x, y)
+                firstPoint = false
+            } else {
+                path.lineTo(x, y)
             }
         }
     }
 
-    // Draw the Scrolling Tail (History Lines) from the circular buffer
-    for (i in 0 until vm.maxPoints - 1) {
-        val currIdx = (vm.writeIndex + i) % vm.maxPoints
-        val nextIdx = (vm.writeIndex + i + 1) % vm.maxPoints
+    // Single-pass Shadow
+    val shadowOffset = 6.dp.toPx()
+    drawContext.canvas.translate(0f, shadowOffset)
+    drawPath(
+        path = path,
+        color = Color.Black.copy(alpha = 0.3f),
+        style = Stroke(width = 3.dp.toPx())
+    )
+    drawContext.canvas.translate(0f, -shadowOffset)
 
-        val p1 = vm.history[currIdx]
-        val p2 = vm.history[nextIdx]
-
-        if (p1 > 0f && p2 > 0f) {
-            val c1 = 1200 * kotlin.math.log2(p1 / target)
-            val c2 = 1200 * kotlin.math.log2(p2 / target)
-
-            val startOffset = Offset(i * stepX, centerY - (c1 * scaleY))
-            val endOffset = Offset((i + 1) * stepX, centerY - (c2 * scaleY))
-
-            drawLine(
-                color = color,
-                start = Offset(i * stepX, centerY - (c1 * scaleY)),
-                end = Offset((i + 1) * stepX, centerY - (c2 * scaleY)),
-                strokeWidth = 2.dp.toPx()
-            )
-        }
-    }
+    // Single-pass Trace
+    drawPath(
+        path = path,
+        color = color,
+        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+    )
 }
 
 @Composable

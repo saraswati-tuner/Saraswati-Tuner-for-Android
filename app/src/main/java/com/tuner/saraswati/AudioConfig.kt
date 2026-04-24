@@ -7,9 +7,9 @@ import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
 
 object AudioConfig {
-    const val SAMPLE_RATE = 44100
-    const val BUFFER_SIZE = 4096
-    const val OVERLAP = 2048
+    const val SAMPLE_RATE = 22050 // 44100
+    const val BUFFER_SIZE = 2048  // 4096
+    const val OVERLAP = 1024      // 2048
     const val MAX_HISTORY_POINTS = 200
     const val SMA_WINDOW_SIZE = 50
     const val HEARING_THRESHOLD = 20f

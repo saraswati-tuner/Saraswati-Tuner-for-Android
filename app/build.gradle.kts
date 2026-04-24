@@ -8,7 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.tuner.saraswati.b15sma50"
+        applicationId = "com.tuner.saraswati"
         minSdk = 31
         targetSdk = 35
         versionCode = 2

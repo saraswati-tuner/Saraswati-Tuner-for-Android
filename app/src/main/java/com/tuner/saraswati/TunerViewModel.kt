@@ -15,6 +15,9 @@ enum class SkillLevel(val label: String, val goal: Float) {
     PROFESSIONAL("Professional", 1f)
 }
 
+// Pre-compute this constant to replace '1200 / log(2)'
+private const val LOG2_1200 = 1731.234f
+
 class TunerViewModel : ViewModel() {
     val splashDurationMillis = 1000L
     var currentPitch by mutableFloatStateOf(0f); private set // For display screen bottom
@@ -22,11 +25,17 @@ class TunerViewModel : ViewModel() {
     var currentLevel by mutableStateOf(SkillLevel.BEGINNER)  // Default
     val targetZoneCents by derivedStateOf { currentLevel.goal }
 
-    // Circular Buffer Data
+    // Circular Buffer Data for drawing pitch history
     val maxPoints = 200
     val history = FloatArray(maxPoints) { -1f }
     var writeIndex by mutableIntStateOf(0)
     var triggerToggle by mutableStateOf(false)
+    private val _centsHistory = FloatArray(maxPoints) { 0f }
+    val centsHistory: FloatArray get() = _centsHistory
+
+    // Circular buffer and pre-computations for smoothing
+    private val pitchWindow = FloatArray(AudioConfig.SMA_WINDOW_SIZE) { 0f }
+    private var nextPitchNdx = 0
 
     // Controls when and how Saraswati bloom appears on sustaining within target zone
     var stabilityMillis by mutableStateOf(0L)
@@ -74,9 +83,57 @@ class TunerViewModel : ViewModel() {
     fun updateStability(currentCents: Double) {
         if (kotlin.math.abs(currentCents) <= targetZoneCents) {
             stabilityMillis += _frameDurationMillis
-            //Log.d("Saraswati Tuner", "stabilitymillis = $stabilityMillis, tz = ${targetZoneCents}")
         } else {
             stabilityMillis = 0L
+        }
+    }
+
+    private fun calculateRefinedMean(window: FloatArray): Float {
+        val validPitches = window.filter { it > 0f }.sorted()
+        if (validPitches.isEmpty()) return 0f
+
+        // Drop the highest and lowest 10% to eliminate jitter
+        val trimCount = (validPitches.size * 0.1).toInt()
+        val filtered = validPitches.drop(trimCount).dropLast(trimCount)
+
+        return if (filtered.isNotEmpty()) filtered.average().toFloat() else validPitches.average().toFloat()
+    }
+
+    fun processNewPitch(rawPitch: Float, probability: Float) {
+        var p = rawPitch
+        val target = targetFreq
+
+        if (p > AudioConfig.HEARING_THRESHOLD && probability > 0.8f) { // Higher prob for precision
+            // Octave normalization
+            while (p < target * 0.707f) p *= 2f
+            while (p > target * 1.414f) p /= 2f
+
+            if (p in (target * 0.95f)..(target * 1.05f)) { // Tighten window for stability
+                pitchWindow[nextPitchNdx] = p
+                nextPitchNdx = (nextPitchNdx + 1) % AudioConfig.SMA_WINDOW_SIZE
+
+                // Refined SMA: Discard outliers before averaging
+                val sma = calculateRefinedMean(pitchWindow)
+
+                if (target > 0f && sma > 0f) {
+                    val cents = (kotlin.math.log2(sma.toDouble() / target) * 1200).toFloat()
+
+                    history[writeIndex] = sma
+                    _centsHistory[writeIndex] = cents
+                    writeIndex = (writeIndex + 1) % maxPoints
+
+                    updateStability(cents.toDouble())
+                    currentPitch = sma
+                }
+                return
+            }
+        }
+
+        // Reset logic if signal is lost
+        if (probability < 0.4f || p <= 0f) {
+            pitchWindow.fill(0f)
+            nextPitchNdx = 0
+            currentPitch = 0f
         }
     }
 
