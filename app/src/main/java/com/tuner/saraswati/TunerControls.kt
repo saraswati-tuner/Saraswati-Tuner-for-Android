@@ -51,7 +51,7 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "TARGET: ",
+                text = "TARGET Sa: ",
                 fontSize = 12.sp,
                 color = Color.Cyan.copy(alpha = 0.7f),
                 fontWeight = FontWeight.Bold

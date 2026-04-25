@@ -85,7 +85,7 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
 
         // 2. NEW: Centered Target Frequency Footer (Gray)
         Text(
-            text = "${viewModel.activePitch.freq} Hz",
+            text = "Sa at ${viewModel.activePitch.freq} Hz",
             color = Color.Gray,
             fontSize = 13.sp,
             fontFamily = FontFamily.Monospace,
