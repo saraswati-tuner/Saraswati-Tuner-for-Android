@@ -265,7 +265,7 @@ private fun DrawScope.drawPitchHistory(
     drawPath(
         path = path,
         color = color,
-        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        style = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round)
     )
 }
 
