@@ -20,7 +20,39 @@ private const val LOG2_1200 = 1731.234f
 
 class TunerViewModel : ViewModel() {
     val splashDurationMillis = 1000L
-    var currentPitch by mutableFloatStateOf(0f); private set // For display screen bottom
+
+    // 1. TARGET (Set by the User)
+    var activePitch by mutableStateOf(TargetPitch.G_SHARP_2)
+    val targetFreq: Float get() = activePitch.freq
+    val selectedTargetPitchLabel: String get() = activePitch.label
+
+    // 2. LIVE OUTPUTS (Updated by the Engine)
+    var rawFrequency by mutableFloatStateOf(0f); private set // Always the gray legend
+    var refinedPitch by mutableFloatStateOf(0f); private set // The colored display & trace
+    val isPitchInRange by derivedStateOf {
+        refinedPitch > 0f && refinedPitch >= lowerBound && refinedPitch <= upperBound
+    }
+
+    // Bounds for the "In Range" check, updated on init and on selection
+    private var lowerBound = 0f
+    private var upperBound = 0f
+    private fun updateBounds() { // Called when target changes
+        lowerBound = targetFreq * 0.9715f // -50 cents
+        upperBound = targetFreq * 1.0293f // +50 cents
+    }
+
+    // Call this whenever activePitch changes
+    fun updateTargetPitch(newPitchLabel: String) {
+        val newPitch = TargetPitch.fromLabel(newPitchLabel)
+        if (activePitch != newPitch) {
+            activePitch = newPitch
+            updateBounds() // Sync the +/- 50 cent walls
+            clearPitchHistory()
+            stabilityMillis = 0L
+        }
+    }
+
+    ////var currentPitch by mutableFloatStateOf(0f); private set // For display screen bottom
 
     var currentLevel by mutableStateOf(SkillLevel.BEGINNER)  // Default
     val targetZoneCents by derivedStateOf { currentLevel.goal }
@@ -42,38 +74,9 @@ class TunerViewModel : ViewModel() {
     var bloomThreshold = 10000L // 5s of continuous hold within targetZone cents
     val isBlooming by derivedStateOf { stabilityMillis >= bloomThreshold }
 
-    var activePitch by mutableStateOf(TargetPitch.G_SHARP_2) // default G#2
-        private set
-
-    val targetFreq: Float get() = activePitch.freq
-    val selectedTargetPitchLabel: String get() = activePitch.label
-
-    fun updateTargetPitch(newPitchLabel: String) {
-        val newPitch = TargetPitch.fromLabel(newPitchLabel)
-        if (activePitch != newPitch) {
-            activePitch = newPitch
-            clearPitchHistory()
-            stabilityMillis = 0L // Reset stability on pitch change
-        }
-    }
-
     private fun clearPitchHistory() {
         history.fill(-1f)
         writeIndex = 0
-        triggerToggle = !triggerToggle
-    }
-
-    fun updatePitch(newPitch: Float) {
-        currentPitch = newPitch
-        history[writeIndex] = newPitch
-        writeIndex = (writeIndex + 1) % maxPoints
-        triggerToggle = !triggerToggle
-    }
-
-    fun resetPitch() {
-        currentPitch = 0f
-        history[writeIndex] = -1f
-        writeIndex = (writeIndex + 1) % maxPoints
         triggerToggle = !triggerToggle
     }
 
@@ -99,45 +102,54 @@ class TunerViewModel : ViewModel() {
         return if (filtered.isNotEmpty()) filtered.average().toFloat() else validPitches.average().toFloat()
     }
 
-    fun processNewPitch(rawPitch: Float, probability: Float) {
-        var p = rawPitch
+    fun processNewPitch(detectedPitch: Float, probability: Float) {
+        var p = detectedPitch
         val target = targetFreq
 
-        if (p > AudioConfig.HEARING_THRESHOLD && probability > 0.8f) { // Higher prob for precision
-            // Octave normalization
+        // STAGE 1: RAW HEAR-THROUGH (The Legend at the bottom)
+        // If the signal is clear, show it in the legend regardless of cent distance
+        if (probability > 0.6f && p > AudioConfig.HEARING_THRESHOLD) {
             while (p < target * 0.707f) p *= 2f
             while (p > target * 1.414f) p /= 2f
-
-            if (p in (target * 0.95f)..(target * 1.05f)) { // Tighten window for stability
-                pitchWindow[nextPitchNdx] = p
-                nextPitchNdx = (nextPitchNdx + 1) % AudioConfig.SMA_WINDOW_SIZE
-
-                // Refined SMA: Discard outliers before averaging
-                val sma = calculateRefinedMean(pitchWindow)
-
-                if (target > 0f && sma > 0f) {
-                    val cents = (kotlin.math.log2(sma.toDouble() / target) * 1200).toFloat()
-
-                    history[writeIndex] = sma
-                    _centsHistory[writeIndex] = cents
-                    writeIndex = (writeIndex + 1) % maxPoints
-
-                    updateStability(cents.toDouble())
-                    currentPitch = sma
-                }
-                return
-            }
+            rawFrequency = p
+        } else {
+            rawFrequency = 0f
         }
 
-        // Reset logic if signal is lost
+        // STAGE 2: REFINEMENT (The Plot & Trace)
+        // Only if it's within 5% of our target, we smooth it for the history
+        if (rawFrequency in (target * 0.95f)..(target * 1.05f)) {
+            pitchWindow[nextPitchNdx] = rawFrequency
+            nextPitchNdx = (nextPitchNdx + 1) % AudioConfig.SMA_WINDOW_SIZE
+
+            val sma = calculateRefinedMean(pitchWindow)
+            if (sma > 0f) {
+                refinedPitch = sma
+                val cents = (kotlin.math.log2(sma.toDouble() / target) * 1200).toFloat()
+
+                // Save to history for drawing
+                history[writeIndex] = sma
+                _centsHistory[writeIndex] = cents
+                writeIndex = (writeIndex + 1) % maxPoints
+
+                updateStability(cents.toDouble())
+                return
+            }
+        } else {
+            refinedPitch = 0f
+            updateStability(Double.MAX_VALUE)
+        }
+
+        // STAGE 3: SILENCE / RESET
         if (probability < 0.4f || p <= 0f) {
-            pitchWindow.fill(0f)
-            nextPitchNdx = 0
-            currentPitch = 0f
+            refinedPitch = 0f
+            // We don't reset history[writeIndex] here so the line just stops drawing
         }
     }
 
     init {
+        updateBounds()
+
         // Calculate the ms duration of the non-overlapping part of the buffer
         val stepSamples = (AudioConfig.BUFFER_SIZE - AudioConfig.OVERLAP).toDouble()
         _frameDurationMillis = ((stepSamples / AudioConfig.SAMPLE_RATE) * 1000).toLong()

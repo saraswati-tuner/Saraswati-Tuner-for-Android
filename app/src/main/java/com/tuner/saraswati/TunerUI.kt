@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -52,6 +54,7 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         modifier = Modifier.fillMaxSize().background(Color.Black).statusBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 1. Menus at top
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -64,7 +67,8 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             LevelDropDown(viewModel)
         }
 
-        Box( // Middle - Plot (and bloom) area
+        // 2. Middle - Plot (and bloom) area
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -83,7 +87,16 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             )
         }
 
-        // 2. NEW: Centered Target Frequency Footer (Gray)
+        // 3. Progress indicator towards bloom
+        val progress = (viewModel.stabilityMillis.toFloat() / 10000f).coerceIn(0f, 1f)
+        ProgressIndicator(
+            pctComplete = progress,
+            activeColor = viewModel.activePitch.color,
+            isOutOfRange = !viewModel.isPitchInRange,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // 4. Target Frequency display (Gray)
         Text(
             text = "Sa at ${viewModel.activePitch.freq} Hz",
             color = Color.Gray,
@@ -92,11 +105,13 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             modifier = Modifier.padding(top = 8.dp)
         )
 
-        // Bottom - (smoothed) freq display (Monospace prevents jumping around)
+        // 5. Bottom - Sung frequency display
         Text(
-            text = if (viewModel.currentPitch > 0) "%.2f Hz".format(viewModel.currentPitch) else "---- Hz",
+            // Use rawFrequency so the user sees their pitch even when far off-target
+            text = if (viewModel.rawFrequency > 0) "%.2f Hz".format(viewModel.rawFrequency) else "---- Hz",
             fontSize = 20.sp,
-            color = viewModel.activePitch.color.copy(alpha = 0.9f),
+            // Use the active color (e.g. Orange) only if within +/- 50 cents, else Gray
+            color = if (viewModel.isPitchInRange) viewModel.activePitch.color.copy(alpha = 0.9f) else Color.Gray,
             modifier = Modifier.padding(bottom = 32.dp),
             fontFamily = FontFamily.Monospace
         )
@@ -270,6 +285,56 @@ private fun DrawScope.drawPitchHistory(
 }
 
 @Composable
+fun ProgressIndicator(
+    pctComplete: Float,
+    activeColor: Color,
+    isOutOfRange: Boolean,
+    modifier: Modifier = Modifier
+) {
+    // 1. Calculate the final state once per frame to prevent flicker
+    val isFinished = pctComplete >= 1f
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size(42.dp)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val fullRadius = size.minDimension / 2
+
+            when {
+                // STATE A: OUT OF RANGE (The "Dim" State)
+                isOutOfRange -> {
+                    drawCircle(color = Color.Gray.copy(alpha = 0.3f), radius = fullRadius)
+                }
+
+                // STATE B: BLOOM (The "Brilliant White" State)
+                isFinished -> {
+                    // 1. THE GLOW (Radial Gradient)
+                    // Fades from 40% White at the edge of the disc to 0% at the outer rim
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color.White.copy(alpha = 0.4f), Color.Transparent),
+                            center = center,
+                            radius = fullRadius * 3f
+                        ),
+                        radius = fullRadius * 3f
+                    )
+                    // 2. THE DISC (Solid White)
+                    drawCircle(color = Color.White, radius = fullRadius)
+                }
+
+                // STATE C: SUSTAINING (The "Growing Aperture" State)
+                else -> {
+                    drawCircle(color = activeColor, radius = fullRadius)
+                    val progressFactor = (1f - pctComplete).coerceIn(0f, 1f)
+                    drawCircle(color = Color.Black, radius = fullRadius * progressFactor)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun GaneshaSplashScreen() {
     Box(
         modifier = Modifier.fillMaxSize().background(Color.White),
@@ -277,7 +342,7 @@ fun GaneshaSplashScreen() {
     ) {
         Image(
             painter = painterResource(id = R.drawable.splash_logo_ganesha),
-            contentDescription = "Ganesha"
+            contentDescription = "ஓம் ஸ்ரீ விநாயகா நம:"
         )
     }
 }
