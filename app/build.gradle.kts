@@ -11,8 +11,8 @@ android {
         applicationId = "com.tuner.saraswati"
         minSdk = 31
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.4-stable"
+        versionCode = 5
+        versionName = "1.5-stable"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

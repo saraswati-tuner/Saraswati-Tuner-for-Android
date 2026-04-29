@@ -21,6 +21,9 @@ private const val LOG2_1200 = 1731.234f
 class TunerViewModel : ViewModel() {
     val splashDurationMillis = 1000L
 
+    var isPaused by mutableStateOf(false)
+    fun togglePause() { isPaused = !isPaused }
+
     // 1. TARGET (Set by the User)
     var activePitch by mutableStateOf(TargetPitch.G_SHARP_2)
     val targetFreq: Float get() = activePitch.freq
@@ -51,8 +54,6 @@ class TunerViewModel : ViewModel() {
             stabilityMillis = 0L
         }
     }
-
-    ////var currentPitch by mutableFloatStateOf(0f); private set // For display screen bottom
 
     var currentLevel by mutableStateOf(SkillLevel.BEGINNER)  // Default
     val targetZoneCents by derivedStateOf { currentLevel.goal }
@@ -103,8 +104,12 @@ class TunerViewModel : ViewModel() {
     }
 
     fun processNewPitch(detectedPitch: Float, probability: Float) {
+        if (isPaused) return
+
         var p = detectedPitch
         val target = targetFreq
+        var finalSma = 0f
+        var finalCents = 0f
 
         // STAGE 1: RAW HEAR-THROUGH (The Legend at the bottom)
         // If the signal is clear, show it in the legend regardless of cent distance
@@ -127,23 +132,24 @@ class TunerViewModel : ViewModel() {
                 refinedPitch = sma
                 val cents = (kotlin.math.log2(sma.toDouble() / target) * 1200).toFloat()
 
-                // Save to history for drawing
-                history[writeIndex] = sma
-                _centsHistory[writeIndex] = cents
-                writeIndex = (writeIndex + 1) % maxPoints
-
-                updateStability(cents.toDouble())
-                return
+                // Only treat as a "valid" point if within the 50c display limit
+                if (kotlin.math.abs(cents) <= 50f) {
+                    finalSma = sma
+                    finalCents = cents
+                }
             }
+        }
+
+        history[writeIndex] = finalSma
+        _centsHistory[writeIndex] = finalCents
+        writeIndex = (writeIndex + 1) % maxPoints
+
+        // Update stability: if finalSma is 0, it resets the 10s timer immediately
+        if (finalSma > 0f) {
+            updateStability(finalCents.toDouble())
         } else {
             refinedPitch = 0f
             updateStability(Double.MAX_VALUE)
-        }
-
-        // STAGE 3: SILENCE / RESET
-        if (probability < 0.4f || p <= 0f) {
-            refinedPitch = 0f
-            // We don't reset history[writeIndex] here so the line just stops drawing
         }
     }
 

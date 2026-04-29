@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.random.Random
 
 // --- UI LAYER: DRAWING & CONTROLS ---
 @Composable
@@ -71,7 +73,8 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .clickable { viewModel.togglePause() },
             contentAlignment = Alignment.Center
         ) {
             Box(Modifier.graphicsLayer {}) { TunerCanvas(viewModel) }
@@ -130,8 +133,8 @@ fun TunerCanvas(viewModel: TunerViewModel) {
 
     val activeColor = viewModel.activePitch.color
 
-    // LAYER 1: Static Grid (only re-draws if level or target changes)
-    Canvas(Modifier.fillMaxSize().padding(vertical = 60.dp)) {
+    // LAYER 1: Static Grid (only re-draws if level or target changes) (dimmed if plot is paused)
+    Canvas(Modifier.fillMaxSize().padding(vertical = 60.dp).graphicsLayer(alpha = if (viewModel.isPaused) 0.8f else 1f)) {
         val centerY = size.height / 2f
         val plotScaleY = size.height / 100f
         drawGoalZone(centerY, plotScaleY, viewModel.currentLevel.goal)
@@ -143,7 +146,6 @@ fun TunerCanvas(viewModel: TunerViewModel) {
         Modifier
             .fillMaxSize()
             .padding(vertical = 60.dp)
-            // Use graphicsLayer here to ensure this layer is hardware-accelerated
             .graphicsLayer()
     ) {
         val centerY = size.height / 2f
@@ -246,7 +248,7 @@ private fun DrawScope.drawPitchHistory(
     }
 
     val path = Path()
-    var firstPoint = true
+    var isPathActive = false
 
     for (i in 0 until vm.maxPoints) {
         val idx = (vm.writeIndex + i) % vm.maxPoints
@@ -257,12 +259,14 @@ private fun DrawScope.drawPitchHistory(
             val x = i * stepX
             val y = centerY - (cents * scaleY)
 
-            if (firstPoint) {
-                path.moveTo(x, y)
-                firstPoint = false
-            } else {
+            if (isPathActive) {
                 path.lineTo(x, y)
+            } else {
+                path.moveTo(x, y)
+                isPathActive = true
             }
+        } else {
+            isPathActive = false
         }
     }
 
@@ -291,7 +295,6 @@ fun ProgressIndicator(
     isOutOfRange: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // 1. Calculate the final state once per frame to prevent flicker
     val isFinished = pctComplete >= 1f
 
     Box(
@@ -311,9 +314,10 @@ fun ProgressIndicator(
                 isFinished -> {
                     // 1. THE GLOW (Radial Gradient)
                     // Fades from 40% White at the edge of the disc to 0% at the outer rim
+                    val randAlpha = Random.nextFloat() * 0.05f +.4f
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.4f), Color.Transparent),
+                            colors = listOf(Color.White.copy(randAlpha), Color.Transparent),
                             center = center,
                             radius = fullRadius * 3f
                         ),
