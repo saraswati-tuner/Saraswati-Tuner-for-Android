@@ -135,14 +135,17 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         )
 
         // 5. Bottom - Sung frequency display
+        // Use rawFrequency so the user sees their pitch even when far off-target
         Text(
-            // Use rawFrequency so the user sees their pitch even when far off-target
-            text = if (viewModel.rawFrequency > 0) "%.2f Hz".format(viewModel.rawFrequency) else "---- Hz",
+            text = if (viewModel.rawFrequency > 0) {
+                "%6.2f Hz".format(viewModel.rawFrequency)
+            } else {
+                "------ Hz" // Six dashes to match the width of "123.45"
+            },
             fontSize = 20.sp,
-            // Use the active color (e.g. Orange) only if within +/- 50 cents, else Gray
             color = if (viewModel.isPitchInRange) viewModel.activePitch.color.copy(alpha = 0.9f) else Color.Gray,
             modifier = Modifier.padding(bottom = 32.dp),
-            fontFamily = FontFamily.Monospace
+            fontFamily = FontFamily.Monospace // Already ensures characters are equal width
         )
     }
 }
@@ -210,14 +213,14 @@ private fun DrawScope.drawGrid(centerY: Float, scaleY: Float, label: String, act
         val isMajor = i % 10 == 0
 
         textPaint.color = activeColor.toArgb()
-        textPaint.alpha = if (i % 10 == 0) 200 else if (i==0) 255 else 140
+        textPaint.alpha = if (i == 0) 255 else 200
 
         val lineLabel = if (i == 0) label else "${i}c"
         val lineStartX = if (isMajor) textPaint.measureText(lineLabel) + 30f else 0f
 
         drawLine(
             color = Color.Gray,
-            alpha = if (i==0) 0.8f else 0.5f, // 0c line is the primary target
+            alpha = if (i==0) 0.8f else .5f, // 0c line is the primary target
 
             start = Offset(lineStartX, y),
             end = Offset(size.width, y),
@@ -353,11 +356,11 @@ fun ProgressIndicator(
                     drawCircle(color = Color.White, radius = fullRadius)
                 }
 
-                // STATE C: SUSTAINING (The "Growing Aperture" State)
+                // STATE C: SUSTAINING (The "Growing Aperture" State, -1 so perimeter always shows)
                 else -> {
                     drawCircle(color = activeColor, radius = fullRadius)
                     val progressFactor = (1f - pctComplete).coerceIn(0f, 1f)
-                    drawCircle(color = Color.Black, radius = fullRadius * progressFactor)
+                    drawCircle(color = Color.Black, radius = fullRadius * progressFactor - 1)
                 }
             }
         }
