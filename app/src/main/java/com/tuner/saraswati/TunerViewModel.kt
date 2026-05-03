@@ -15,9 +15,6 @@ enum class SkillLevel(val label: String, val goal: Float) {
     PROFESSIONAL("Professional", 1f)
 }
 
-// Pre-compute this constant to replace '1200 / log(2)'
-private const val LOG2_1200 = 1731.234f
-
 class TunerViewModel : ViewModel() {
     val splashDurationMillis = 1000L
 
@@ -51,8 +48,8 @@ class TunerViewModel : ViewModel() {
             activePitch = newPitch
             updateBounds() // Sync the +/- 50 cent walls
             clearPitchHistory()
-            totalSustainMillis = 0f
-            goalSustainMillis = 0f
+            totalSustainMillis = 0L
+            goalSustainMillis = 0L
         }
     }
 
@@ -73,12 +70,12 @@ class TunerViewModel : ViewModel() {
 
     // ---- Bloom and feedback related ----
     // Controls when and how Saraswati bloom appears on sustaining within target zone
-    var bloomThreshold = 10000L // 5s of continuous hold within targetZone cents
+    var bloomThreshold = 10000L // 10s of continuous hold within targetZone cents
     val isBlooming by derivedStateOf { goalSustainMillis >= bloomThreshold }
 
     // For display of time within Goal zone and total time sustained
-    var totalSustainMillis by mutableFloatStateOf(0.0f); private set
-    var goalSustainMillis by mutableFloatStateOf(0.0f); private set
+    var totalSustainMillis by mutableStateOf(0L); private set
+    var goalSustainMillis by mutableStateOf(0L); private set
 
     // How long is a single audio frame (set in init)
     private var _frameDurationMillis: Long = 0L
@@ -87,14 +84,6 @@ class TunerViewModel : ViewModel() {
         history.fill(-1f)
         writeIndex = 0
         triggerToggle = !triggerToggle
-    }
-
-    fun xupdateStability(currentCents: Double) { /////////
-        if (kotlin.math.abs(currentCents) <= targetZoneCents) {
-            goalSustainMillis += _frameDurationMillis
-        } else {
-            goalSustainMillis = 0f
-        }
     }
 
     fun updateStability(currentCents: Double) {
@@ -106,11 +95,11 @@ class TunerViewModel : ViewModel() {
             if (kotlin.math.abs(currentCents) <= targetZoneCents) {
                 goalSustainMillis += _frameDurationMillis
             } else {
-                goalSustainMillis = 0f
+                goalSustainMillis = 0
             }
         } else {             // Silence or Major Deviation: Full reset
-            totalSustainMillis = 0f
-            goalSustainMillis = 0f
+            totalSustainMillis = 0
+            goalSustainMillis = 0
         }
     }
 

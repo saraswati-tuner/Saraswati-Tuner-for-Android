@@ -90,7 +90,7 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             )
         }
 
-// 3. Progress indicator with flanking sustain timers
+        // 3. Progress indicator with flanking sustain timers
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 8.dp)
