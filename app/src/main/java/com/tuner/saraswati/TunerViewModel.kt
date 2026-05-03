@@ -51,7 +51,8 @@ class TunerViewModel : ViewModel() {
             activePitch = newPitch
             updateBounds() // Sync the +/- 50 cent walls
             clearPitchHistory()
-            stabilityMillis = 0L
+            totalSustainMillis = 0f
+            goalSustainMillis = 0f
         }
     }
 
@@ -70,10 +71,17 @@ class TunerViewModel : ViewModel() {
     private val pitchWindow = FloatArray(AudioConfig.SMA_WINDOW_SIZE) { 0f }
     private var nextPitchNdx = 0
 
+    // ---- Bloom and feedback related ----
     // Controls when and how Saraswati bloom appears on sustaining within target zone
-    var stabilityMillis by mutableStateOf(0L)
     var bloomThreshold = 10000L // 5s of continuous hold within targetZone cents
-    val isBlooming by derivedStateOf { stabilityMillis >= bloomThreshold }
+    val isBlooming by derivedStateOf { goalSustainMillis >= bloomThreshold }
+
+    // For display of time within Goal zone and total time sustained
+    var totalSustainMillis by mutableFloatStateOf(0.0f); private set
+    var goalSustainMillis by mutableFloatStateOf(0.0f); private set
+
+    // How long is a single audio frame (set in init)
+    private var _frameDurationMillis: Long = 0L
 
     private fun clearPitchHistory() {
         history.fill(-1f)
@@ -81,14 +89,28 @@ class TunerViewModel : ViewModel() {
         triggerToggle = !triggerToggle
     }
 
-    // How long to hold freq for bloom to appear
-    private var _frameDurationMillis: Long = 0L
+    fun xupdateStability(currentCents: Double) { /////////
+        if (kotlin.math.abs(currentCents) <= targetZoneCents) {
+            goalSustainMillis += _frameDurationMillis
+        } else {
+            goalSustainMillis = 0f
+        }
+    }
 
     fun updateStability(currentCents: Double) {
-        if (kotlin.math.abs(currentCents) <= targetZoneCents) {
-            stabilityMillis += _frameDurationMillis
-        } else {
-            stabilityMillis = 0L
+        if (kotlin.math.abs(currentCents) <= 50.0) {
+            // LEFT TIMER: Breath & Intent (+/- 50c)
+            totalSustainMillis += _frameDurationMillis
+
+            // RIGHT TIMER & BLOOM: Precision (within goal zone)
+            if (kotlin.math.abs(currentCents) <= targetZoneCents) {
+                goalSustainMillis += _frameDurationMillis
+            } else {
+                goalSustainMillis = 0f
+            }
+        } else {             // Silence or Major Deviation: Full reset
+            totalSustainMillis = 0f
+            goalSustainMillis = 0f
         }
     }
 

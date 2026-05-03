@@ -90,14 +90,40 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
             )
         }
 
-        // 3. Progress indicator towards bloom
-        val progress = (viewModel.stabilityMillis.toFloat() / 10000f).coerceIn(0f, 1f)
-        ProgressIndicator(
-            pctComplete = progress,
-            activeColor = viewModel.activePitch.color,
-            isOutOfRange = !viewModel.isPitchInRange,
+// 3. Progress indicator with flanking sustain timers
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 8.dp)
-        )
+        ) {
+            // Left: Total Sustain (White 50%)
+            Text(
+                text = "%.1f".format(viewModel.totalSustainMillis / 1000f),
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(40.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End
+            )
+
+            // progress is the fraction of time within 10s, hence 10K denom below
+            val progress = (viewModel.goalSustainMillis / 10000f).coerceIn(0f, 1f)
+            ProgressIndicator(
+                pctComplete = progress,
+                activeColor = viewModel.activePitch.color,
+                isOutOfRange = !viewModel.isPitchInRange,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+
+            // Right: Precision Sustain (Active Color 50%)
+            Text(
+                text = "%.1f".format(viewModel.goalSustainMillis / 1000f),
+                color = viewModel.activePitch.color.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(40.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Start
+            )
+        }
 
         // 4. Target Frequency display (Gray)
         Text(
