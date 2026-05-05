@@ -79,6 +79,18 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         ) {
             Box(Modifier.graphicsLayer {}) { TunerCanvas(viewModel) }
 
+            if (viewModel.isPaused) {  // The "TAP TO RESUME"
+                Text(
+                    text = "TAP TO RESUME",
+                    color = Color.Gray.copy(alpha = 0.8f),
+                    fontSize = 18.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 12.dp)
+                )
+            }
+
             Image(
                 painter = painterResource(id = R.drawable.saraswati_bloom),
                 contentDescription = null,
