@@ -9,10 +9,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 
 enum class SkillLevel(val label: String, val goal: Float) {
-    BEGINNER("Beginner", 15f),
-    INTERMEDIATE("Intermediate", 5f),
+    EASY("Easy", 15f),
+    MEDIUM("Medium", 5f),
     ADVANCED("Advanced", 2f),
-    PROFESSIONAL("Professional", 1f)
+    PROFESSIONAL("Pro", 1f)
 }
 
 class TunerViewModel : ViewModel() {
@@ -22,8 +22,11 @@ class TunerViewModel : ViewModel() {
     fun togglePause() { isPaused = !isPaused }
 
     // 1. TARGET (Set by the User)
-    var activePitch by mutableStateOf(TargetPitch.G_SHARP_2)
-    val targetFreq: Float get() = activePitch.freq
+    var isLowerOctave by mutableStateOf(true)
+    fun toggleOctave() { isLowerOctave = !isLowerOctave; syncTunerEnvironment() }
+
+    var activePitch by mutableStateOf(TargetPitch.G_SHARP_LO)
+    val targetFreq: Float get() = activePitch.freq * if (isLowerOctave) 1f else 2f
     val selectedTargetPitchLabel: String get() = activePitch.label
 
     // 2. LIVE OUTPUTS (Updated by the Engine)
@@ -46,14 +49,19 @@ class TunerViewModel : ViewModel() {
         val newPitch = TargetPitch.fromLabel(newPitchLabel)
         if (activePitch != newPitch) {
             activePitch = newPitch
-            updateBounds() // Sync the +/- 50 cent walls
-            clearPitchHistory()
-            totalSustainMillis = 0L
-            goalSustainMillis = 0L
+            syncTunerEnvironment()
         }
     }
 
-    var currentLevel by mutableStateOf(SkillLevel.BEGINNER)  // Default
+    private fun syncTunerEnvironment() {
+        updateBounds()      // Re-calculates lower/upperBound using the new targetFreq
+        clearPitchHistory() // Wipes the visual trace
+        totalSustainMillis = 0L
+        goalSustainMillis = 0L
+        refinedPitch = 0f
+    }
+
+    var currentLevel by mutableStateOf(SkillLevel.EASY)  // Default
     val targetZoneCents by derivedStateOf { currentLevel.goal }
 
     // Circular Buffer Data for drawing pitch history
@@ -133,20 +141,21 @@ class TunerViewModel : ViewModel() {
         }
 
         // STAGE 2: REFINEMENT (The Plot & Trace)
-        // Only if it's within 5% of our target, we smooth it for the history
-        if (rawFrequency in (target * 0.95f)..(target * 1.05f)) {
-            pitchWindow[nextPitchNdx] = rawFrequency
-            nextPitchNdx = (nextPitchNdx + 1) % AudioConfig.SMA_WINDOW_SIZE
+        if (rawFrequency > 0f) {
+            if (rawFrequency in (target * 0.95f)..(target * 1.05f)) {
+                pitchWindow[nextPitchNdx] = rawFrequency
+                nextPitchNdx = (nextPitchNdx + 1) % AudioConfig.SMA_WINDOW_SIZE
 
-            val sma = calculateRefinedMean(pitchWindow)
-            if (sma > 0f) {
-                refinedPitch = sma
-                val cents = (kotlin.math.log2(sma.toDouble() / target) * 1200).toFloat()
+                val sma = calculateRefinedMean(pitchWindow)
+                if (sma > 0f) {
+                    refinedPitch = sma
+                    val cents = (kotlin.math.log2(sma.toDouble() / target) * 1200).toFloat()
 
-                // Only treat as a "valid" point if within the 50c display limit
-                if (kotlin.math.abs(cents) <= 50f) {
-                    finalSma = sma
-                    finalCents = cents
+                    // Only treat as a "valid" point if within the 50c display limit
+                    if (kotlin.math.abs(cents) <= 50f) {
+                        finalSma = sma
+                        finalCents = cents
+                    }
                 }
             }
         }

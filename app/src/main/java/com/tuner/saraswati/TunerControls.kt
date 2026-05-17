@@ -104,6 +104,72 @@ fun TargetPitchDropDown(viewModel: TunerViewModel) {
 }
 
 @Composable
+fun OctaveDropDown(viewModel: TunerViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.wrapContentSize()) {
+        Row(
+            modifier = Modifier
+                .clickable { expanded = true }
+                .padding(vertical = 4.dp, horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "OCTAVE: ",
+                fontSize = 12.sp,
+                color = Color.Cyan.copy(alpha = 0.7f),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = if (viewModel.isLowerOctave) "Low" else "High",
+                fontSize = 14.sp,
+                color = Color.White,
+                fontFamily = FontFamily.Monospace
+            )
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            shadowElevation = 0.dp,
+            modifier = Modifier
+                .background(
+                    Color(0xFF0A0A0A).copy(alpha = 0.95f),
+                    RoundedCornerShape(12.dp)
+                )
+                .border(0.5.dp, Color.White.copy(alpha = 0.2f))
+        ) {
+            // Option 1: Low
+            DropdownMenuItem(
+                text = {
+                    Text("Low", color = Color.White, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                },
+                onClick = {
+                    if (!viewModel.isLowerOctave) viewModel.toggleOctave()
+                    expanded = false
+                }
+            )
+            // Option 2: High
+            DropdownMenuItem(
+                text = {
+                    Text("High", color = Color.White, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                },
+                onClick = {
+                    if (viewModel.isLowerOctave) viewModel.toggleOctave()
+                    expanded = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
 fun LevelDropDown(viewModel: TunerViewModel) {
     var expanded by remember { mutableStateOf(false) }
     var rowWidth by remember { mutableIntStateOf(0) } // To store the width in pixels
@@ -113,7 +179,6 @@ fun LevelDropDown(viewModel: TunerViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .onGloballyPositioned { coordinates ->
-                    // This captures the total width of Label + Selection + Icon
                     rowWidth = coordinates.size.width
                 }
                 .clickable { expanded = true }
@@ -126,7 +191,7 @@ fun LevelDropDown(viewModel: TunerViewModel) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = viewModel.currentLevel.label.uppercase(),
+                text = viewModel.currentLevel.label,
                 fontSize = 14.sp,
                 color = Color.White,
                 fontFamily = FontFamily.Monospace

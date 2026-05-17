@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -60,13 +59,20 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp), // Minimal top padding
+                .padding(horizontal = 8.dp) // Anchors the left and right
+                .padding(top = 4.dp),
             horizontalArrangement = Arrangement.Center, // Center the whole row
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TargetPitchDropDown(viewModel)
-            Spacer(Modifier.width(24.dp)) // Gap between the two menus
-            LevelDropDown(viewModel)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                TargetPitchDropDown(viewModel)
+            }
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                OctaveDropDown(viewModel)
+            }
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                LevelDropDown(viewModel)
+            }
         }
 
         // 2. Middle - Plot (and bloom) area
@@ -79,7 +85,7 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         ) {
             Box(Modifier.graphicsLayer {}) { TunerCanvas(viewModel) }
 
-            if (viewModel.isPaused) {  // The "TAP TO RESUME"
+            if (viewModel.isPaused) {
                 Text(
                     text = "TAP TO RESUME",
                     color = Color.Gray.copy(alpha = 0.8f),
@@ -139,7 +145,7 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
 
         // 4. Target Frequency display (Gray)
         Text(
-            text = "Sa at ${viewModel.activePitch.freq} Hz",
+            text = "Sa at ${viewModel.targetFreq} Hz",
             color = Color.Gray,
             fontSize = 13.sp,
             fontFamily = FontFamily.Monospace,
