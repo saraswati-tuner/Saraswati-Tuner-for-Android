@@ -76,6 +76,12 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
         }
 
         // 2. Middle - Plot (and bloom) area
+        val plotAlpha by animateFloatAsState(
+            targetValue = if (viewModel.isPaused) 0.5f else 1f,
+            animationSpec = tween(durationMillis = 200),
+            label = "PlotPause"
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -83,12 +89,14 @@ fun TunerMainScreen(viewModel: TunerViewModel) {
                 .clickable { viewModel.togglePause() },
             contentAlignment = Alignment.Center
         ) {
-            Box(Modifier.graphicsLayer {}) { TunerCanvas(viewModel) }
+            Box(Modifier.graphicsLayer(alpha = plotAlpha)) {
+                TunerCanvas(viewModel)
+            }
 
             if (viewModel.isPaused) {
                 Text(
                     text = "TAP TO RESUME",
-                    color = Color.Gray.copy(alpha = 0.8f),
+                    color = Color.White,
                     fontSize = 18.sp,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier

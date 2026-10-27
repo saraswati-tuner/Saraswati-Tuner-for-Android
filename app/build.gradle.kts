@@ -10,16 +10,17 @@ android {
     defaultConfig {
         applicationId = "com.tuner.saraswati"
         minSdk = 31
-        targetSdk = 35
-        versionCode = 8
-        versionName = "1.8-public-0"
+        targetSdk = 36
+        versionCode = 10
+        versionName = "1.10-public-0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
